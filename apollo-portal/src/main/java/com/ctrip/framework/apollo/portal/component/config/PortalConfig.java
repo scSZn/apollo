@@ -38,15 +38,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * PortalConfig，包含了Portal服务所有相关的配置
+ */
 @Component
 public class PortalConfig extends RefreshableConfig {
 
   private static final Logger logger = LoggerFactory.getLogger(PortalConfig.class);
 
+  /**
+   * 用于反序列化的东西
+   */
   private static final Gson GSON = new Gson();
+
+  /**
+   * 组织机构相关的Type，用于反序列化
+   */
   private static final Type ORGANIZATION = new TypeToken<List<Organization>>() {
   }.getType();
 
+  /**
+   * 弱密码检查，其中的密码是不被允许的
+   */
   private static final List<String> DEFAULT_USER_PASSWORD_NOT_ALLOW_LIST = Arrays.asList(
       "111", "222", "333", "444", "555", "666", "777", "888", "999", "000",
       "001122", "112233", "223344", "334455", "445566", "556677", "667788", "778899", "889900",
@@ -57,16 +70,34 @@ public class PortalConfig extends RefreshableConfig {
   );
 
   /**
-   * meta servers config in "PortalDB.ServerConfig"
+   * meta servers config in "PortalDB.ServerConfig"<br>
+   * 用于反序列化MetaServers的Type
    */
   private static final Type META_SERVERS = new TypeToken<Map<String, String>>(){}.getType();
 
+  /**
+   * 从数据库中获取的配置的数据源
+   * <li>
+   *     PortalDBPropertySource会从数据库中读取ServerConfig表的数据，其中包含了Portal的大多数配置
+   * </li>
+   * <li>
+   *     PortalConfig继承了RefreshableConfig，RefreshableConfig是一个抽象类，它会负责将子类实现的
+   *     {@link com.ctrip.framework.apollo.common.config.RefreshableConfig#getRefreshablePropertySources()}
+   *     方法返回的{@link com.ctrip.framework.apollo.common.config.RefreshablePropertySource}
+   *     列表增加到Spring的ApplicationContext的Environment中，并会定时调用RefreshablePropertySource的refresh方法刷新配置
+   * </li>
+   */
   private final PortalDBPropertySource portalDBPropertySource;
 
   public PortalConfig(final PortalDBPropertySource portalDBPropertySource) {
     this.portalDBPropertySource = portalDBPropertySource;
   }
 
+  /**
+   * 实现相关方法，会将PortalDBPropertySource塞进Environment中，并进行定时刷新
+   *
+   * @return
+   */
   @Override
   public List<RefreshablePropertySource> getRefreshablePropertySources() {
     return Collections.singletonList(portalDBPropertySource);

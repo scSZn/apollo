@@ -17,6 +17,11 @@
 package com.ctrip.framework.apollo.portal.environment;
 
 /**
+ * <p>
+ *     扩展接口，用于方便扩展获取MetaServer地址的接口，通过扩展这个接口，我们可以从各种位置获取到MetaServer的地址
+ * </p>
+ *
+ * <br>
  * For the supporting of multiple meta server address providers.
  * From configuration file,
  * from OS environment,
@@ -28,18 +33,30 @@ package com.ctrip.framework.apollo.portal.environment;
 public interface PortalMetaServerProvider {
 
   /**
+   * <p>
+   *     获取目标环境targetEnv的MetaServer地址
+   * </p>
+   *
    * @param targetEnv environment
    * @return meta server address matched environment
    */
   String getMetaServerAddress(Env targetEnv);
 
   /**
+   * <p>
+   *     判断目标环境的MetaServer地址是否存在
+   * </p>
+   *
    * @param targetEnv environment
    * @return environment's meta server address exists or not
    */
   boolean exists(Env targetEnv);
 
   /**
+   * <p>
+   *     重新加载配置
+   * </p>
+   *
    * reload the meta server address in runtime
    */
   void reload();

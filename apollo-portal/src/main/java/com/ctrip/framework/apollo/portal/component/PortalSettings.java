@@ -39,18 +39,35 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * <p>主要负责检测各个环境是否可用</p>
+ * <p>检测方式即通过AdminService的健康检查机制来判断是否可用</p>
+ */
 @Component
 public class PortalSettings {
 
   private static final Logger logger = LoggerFactory.getLogger(PortalSettings.class);
+  /**
+   * 健康检查的时间，10秒钟检查一次
+   */
   private static final int HEALTH_CHECK_INTERVAL = 10 * 1000;
 
   private final ApplicationContext applicationContext;
+  /**
+   * Portal服务的配置，含有所有的相关配置
+   */
   private final PortalConfig portalConfig;
+
+  /**
+   * 用于获取MetaService地址
+   */
   private final PortalMetaDomainService portalMetaDomainService;
 
   private List<Env> allEnvs = new ArrayList<>();
 
+  /**
+   * 用来标记环境是否可用的map，key为环境，value为这个环境是否可用，true为可用，false为不可用
+   */
   //mark env up or down
   private Map<Env, Boolean> envStatusMark = new ConcurrentHashMap<>();
 
@@ -64,6 +81,9 @@ public class PortalSettings {
     this.portalMetaDomainService = portalMetaDomainService;
   }
 
+  /**
+   * 在启动的时候会从配置中获取到可用的所有环境，这个读取没有刷新的功能，也就是说，在Portal启动的时候就确定了所有的ENV环境了，如果增加修改删除了某个环境，必须要重启Portal服务才能生效
+   */
   @PostConstruct
   private void postConstruct() {
 
@@ -102,6 +122,9 @@ public class PortalSettings {
     return mark != null && mark;
   }
 
+  /**
+   * 用于检查某个环境是否可用，本质上就是检查某个环境的AdminService是否健康
+   */
   private class HealthCheckTask implements Runnable {
 
     private static final int ENV_DOWN_THRESHOLD = 2;

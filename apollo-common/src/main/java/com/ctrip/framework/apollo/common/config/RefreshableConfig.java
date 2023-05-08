@@ -35,7 +35,11 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 
-
+/**
+ * RefreshableConfig 可刷新的配置，其中会包含一批{@link com.ctrip.framework.apollo.common.config.RefreshablePropertySource}，
+ * 定时刷新（60秒）其中的RefreshablePropertySource，
+ * 这一批RefreshablePropertySource则是从子类返回的，从getRefreshablePropertySources方法返回
+ */
 public abstract class RefreshableConfig {
 
   private static final Logger logger = LoggerFactory.getLogger(RefreshableConfig.class);

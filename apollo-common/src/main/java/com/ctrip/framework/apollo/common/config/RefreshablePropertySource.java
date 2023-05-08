@@ -20,6 +20,10 @@ import org.springframework.core.env.MapPropertySource;
 
 import java.util.Map;
 
+/**
+ * 可刷新的数据源，会通过{@link com.ctrip.framework.apollo.common.config.RefreshableConfig}调用refresh方法进行刷新，
+ * 相关设置方法可见{@link com.ctrip.framework.apollo.common.config.RefreshableConfig#setup()}
+ */
 public abstract class RefreshablePropertySource extends MapPropertySource {
 
 

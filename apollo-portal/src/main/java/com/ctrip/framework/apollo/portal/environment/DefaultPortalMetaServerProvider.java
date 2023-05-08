@@ -28,6 +28,15 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * <p>
+ *     用于给portal查询MetaServer的地址，它会从在portal启动的时候，从依次从下面的位置寻找MetaServer的地址（优先级从高到低）
+ *     <ul>
+ *         <li>JVM的系统属性SystemProperty，以_meta结尾的key，大小写敏感</li>
+ *         <li>操作系统的环境变量，以_meta结尾的key，大小写敏感</li>
+ *         <li>用户的配置文件，以.meta结尾的key，大小写敏感</li>
+ *     </ul>
+ * </p>
+ *
  * Only use in apollo-portal
  * load all meta server address from
  *  - System Property           [key ends with "_meta" (case insensitive)]
@@ -42,11 +51,18 @@ class DefaultPortalMetaServerProvider implements PortalMetaServerProvider {
     private static final Logger logger = LoggerFactory.getLogger(DefaultPortalMetaServerProvider.class);
 
     /**
+     * 默认的Apollo环境metaServer地址的配置文件
+     *
+     * <br>
+     *
      * environments and their meta server address
      * properties file path
      */
     private static final String APOLLO_ENV_PROPERTIES_FILE_PATH = "apollo-env.properties";
 
+    /**
+     * 保存了每个环境到该环境的MetaServer地址的映射，如果有多个MetaServer，则用逗号隔开
+     */
     private volatile Map<Env, String> domains;
 
     DefaultPortalMetaServerProvider() {
