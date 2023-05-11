@@ -59,6 +59,18 @@ public class OidcUserInfoHolder implements UserInfoHolder {
     return userInfo;
   }
 
+  /**
+   * 先内部获取基本的用户信息，原理是从SpringSecurity上下文中获取到保存的用户信息<br/>
+   * 支持多种类型的Principal
+   * <ul>
+   *     <li>{@link org.springframework.security.oauth2.core.oidc.user.OidcUser}</li>
+   *     <li>{@link org.springframework.security.oauth2.jwt.Jwt}</li>
+   *     <li>{@link org.springframework.security.oauth2.core.user.OAuth2User}</li>
+   *     <li>{@link java.security.Principal}</li>
+   *     <li>{@link java.lang.String}</li>
+   * </ul>
+   * @return
+   */
   private UserInfo getUserInternal() {
     Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     if (principal instanceof OidcUser) {

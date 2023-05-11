@@ -94,6 +94,11 @@ public class AppController {
     this.additionalUserInfoEnrichService = additionalUserInfoEnrichService;
   }
 
+  /**
+   * 查找APP，如果没有输入任何参数，则代表查找所有的APP
+   * @param appIds  查询指定的appId，多个appId用逗号连接起来
+   * @return
+   */
   @GetMapping
   public List<App> findApps(@RequestParam(value = "appIds", required = false) String appIds) {
     if (Strings.isNullOrEmpty(appIds)) {
@@ -233,7 +238,8 @@ public class AppController {
   }
 
   /**
-   * 删除指定APP。同时需要将信息同步到AdminService，通过事件机制
+   * 删除指定APP。同时需要将信息同步到AdminService，通过事件机制<br/>
+   * 见 {@link com.ctrip.framework.apollo.portal.listener.DeletionListener#onAppDeletionEvent(com.ctrip.framework.apollo.portal.listener.AppDeletionEvent)}
    * @param appId
    */
   @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
@@ -245,8 +251,8 @@ public class AppController {
   }
 
   /**
-   * 查询该APP在哪个环境中不存在，可能是创建失败，或者后来接入的环境<br/>
-   * 该API的实现是通过遍历所有的ENV，尝试去对应的AdminService获取APP信息，如果没有获取到（404），则说明在该环境中没有创建成功
+   * 查询该APP在哪个环境中不存在，可能是创建失败，或者是后来接入的环境<br/>
+   * 该API的实现是通过遍历所有的env，尝试去对应的AdminService获取APP信息，如果没有获取到（404），则说明在该环境中没有创建成功
    *
    * @param appId 指定APP的ID
    * @return

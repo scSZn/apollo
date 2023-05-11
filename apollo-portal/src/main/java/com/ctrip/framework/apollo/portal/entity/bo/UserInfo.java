@@ -16,6 +16,9 @@
  */
 package com.ctrip.framework.apollo.portal.entity.bo;
 
+/**
+ * 用户信息，只有最基本的id，用户名，邮箱，启用状态
+ */
 public class UserInfo {
 
   private String userId;

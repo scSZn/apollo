@@ -19,6 +19,20 @@ package com.ctrip.framework.apollo.portal.spi;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+/**
+ * <p>
+ *     登出的处理器，只有一个logout方法。目前只有两个实现类
+ *     <ul>
+ *         <li>
+ *             {@link com.ctrip.framework.apollo.portal.spi.defaultimpl.DefaultLogoutHandler}默认的登出处理器，
+ *         只有一个功能，重定向到首页，其他不做处理
+ *         </li>
+ *         <li>
+ *            {@link com.ctrip.framework.apollo.portal.spi.oidc.OidcLogoutHandler}OIDC协议的登出处理器，目前看没有实现，是空方法 2023-05-09
+ *         </li>
+ *     </ul>
+ * </p>
+ */
 public interface LogoutHandler {
 
   void logout(HttpServletRequest request, HttpServletResponse response);

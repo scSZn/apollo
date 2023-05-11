@@ -58,6 +58,12 @@ public class UserInfoController {
     this.passwordChecker = passwordChecker;
   }
 
+  /**
+   * 创建用户
+   *
+   * @param isCreate
+   * @param user
+   */
   @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
   @PostMapping("/users")
   public void createOrUpdateUser(
@@ -67,6 +73,7 @@ public class UserInfoController {
       throw new BadRequestException("Username and password can not be empty.");
     }
 
+    // 检查弱密码
     CheckResult pwdCheckRes = passwordChecker.checkWeakPassword(user.getPassword());
     if (!pwdCheckRes.isSuccess()) {
       throw new BadRequestException(pwdCheckRes.getMessage());
@@ -83,6 +90,10 @@ public class UserInfoController {
     }
   }
 
+  /**
+   * 启用用户
+   * @param user
+   */
   @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
   @PutMapping("/users/enabled")
   public void changeUserEnabled(@RequestBody UserPO user) {
@@ -93,16 +104,34 @@ public class UserInfoController {
     }
   }
 
+  /**
+   * 获取当前用户的用户名
+   * @return
+   */
   @GetMapping("/user")
   public UserInfo getCurrentUserName() {
     return userInfoHolder.getUser();
   }
 
+  /**
+   * 用户登出
+   * @param request
+   * @param response
+   * @throws IOException
+   */
   @GetMapping("/user/logout")
   public void logout(HttpServletRequest request, HttpServletResponse response) throws IOException {
     logoutHandler.logout(request, response);
   }
 
+  /**
+   * 通过关键字查询用户
+   * @param keyword               关键字
+   * @param includeInactiveUsers  是否包含未激活的用户，默认为false
+   * @param offset                偏移量
+   * @param limit                 查询数量
+   * @return
+   */
   @GetMapping("/users")
   public List<UserInfo> searchUsersByKeyword(@RequestParam(value = "keyword") String keyword,
       @RequestParam(value = "includeInactiveUsers", defaultValue = "false") boolean includeInactiveUsers,
@@ -111,6 +140,11 @@ public class UserInfoController {
     return userService.searchUsers(keyword, offset, limit, includeInactiveUsers);
   }
 
+  /**
+   * 根据用户ID（即登录名）获取用户数据
+   * @param userId
+   * @return
+   */
   @GetMapping("/users/{userId}")
   public UserInfo getUserByUserId(@PathVariable String userId) {
     return userService.findByUserId(userId);
