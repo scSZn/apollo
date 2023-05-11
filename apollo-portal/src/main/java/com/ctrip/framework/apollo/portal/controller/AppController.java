@@ -96,6 +96,9 @@ public class AppController {
 
   /**
    * 查找APP，如果没有输入任何参数，则代表查找所有的APP
+   * <p>
+   *     实现方式：实现上没有什么特殊的地方，就是直接查询数据库获取相应的APP信息
+   * </p>
    * @param appIds  查询指定的appId，多个appId用逗号连接起来
    * @return
    */
@@ -107,6 +110,23 @@ public class AppController {
     return appService.findByAppIds(Sets.newHashSet(appIds.split(",")));
   }
 
+  /**
+   * 查询APP信息
+   * <p>
+   *     实现方式：
+   *     <ol>
+   *         <li>
+   *             通过 {@link com.ctrip.framework.apollo.portal.service.RolePermissionService#findUserRoles(String)} 查询该人员拥有的角色
+   *         </li>
+   *         <li>
+   *             从角色中提取出APPID信息，然后查询这些APP
+   *         </li>
+   *     </ol>
+   * </p>
+   * @param owner 用户ID（即登录名）
+   * @param page  分页相关参数
+   * @return
+   */
   @GetMapping("/by-owner")
   public List<App> findAppsByOwner(@RequestParam("owner") String owner, Pageable page) {
     Set<String> appIds = Sets.newHashSet();
