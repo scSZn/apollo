@@ -66,6 +66,14 @@ public class ItemController {
     this.releaseService = releaseService;
   }
 
+  /**
+   * 创建配置项
+   * @param appId           应用ID
+   * @param clusterName     集群名称
+   * @param namespaceName   命名空间名称
+   * @param dto             配置项
+   * @return
+   */
   @PreAcquireNamespaceLock
   @PostMapping("/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/items")
   public ItemDTO create(@PathVariable("appId") String appId,
@@ -73,12 +81,15 @@ public class ItemController {
                         @PathVariable("namespaceName") String namespaceName, @RequestBody ItemDTO dto) {
     Item entity = BeanUtils.transform(Item.class, dto);
 
+    // 1. 查询是否有Item
     Item managedEntity = itemService.findOne(appId, clusterName, namespaceName, entity.getKey());
     if (managedEntity != null) {
       throw BadRequestException.itemAlreadyExists(entity.getKey());
     }
+    // 2. 保存Item
     entity = itemService.save(entity);
     dto = BeanUtils.transform(ItemDTO.class, entity);
+    // 3. 创建提交记录
     commitService.createCommit(appId, clusterName, namespaceName, new ConfigChangeContentBuilder().createItem(entity).build(),
         dto.getDataChangeLastModifiedBy()
     );

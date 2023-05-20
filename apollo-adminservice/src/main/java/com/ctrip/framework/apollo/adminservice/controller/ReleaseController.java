@@ -114,6 +114,18 @@ public class ReleaseController {
     return BeanUtils.transform(ReleaseDTO.class, release);
   }
 
+  /**
+   * 创建Release记录
+   *
+   * @param appId               应用ID
+   * @param clusterName         集群名称
+   * @param namespaceName       命名空间名称
+   * @param releaseName         发布记录标题
+   * @param releaseComment      发布记录的备注
+   * @param operator            操作人
+   * @param isEmergencyPublish  是否紧急发布
+   * @return
+   */
   @Transactional
   @PostMapping("/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/releases")
   public ReleaseDTO publish(@PathVariable("appId") String appId,
@@ -123,12 +135,15 @@ public class ReleaseController {
                             @RequestParam(name = "comment", required = false) String releaseComment,
                             @RequestParam("operator") String operator,
                             @RequestParam(name = "isEmergencyPublish", defaultValue = "false") boolean isEmergencyPublish) {
+    // 1. 查到需要发布的Namespace
     Namespace namespace = namespaceService.findOne(appId, clusterName, namespaceName);
     if (namespace == null) {
       throw NotFoundException.namespaceNotFound(appId, clusterName, namespaceName);
     }
+    // 2. 发布Namespace
     Release release = releaseService.publish(namespace, releaseName, releaseComment, operator, isEmergencyPublish);
 
+    // 3. 发送发布消息
     //send release message
     Namespace parentNamespace = namespaceService.findParentNamespace(namespace);
     String messageCluster;
@@ -137,6 +152,7 @@ public class ReleaseController {
     } else {
       messageCluster = clusterName;
     }
+    // 发布消息
     messageSender.sendMessage(ReleaseMessageKeyGenerator.generate(appId, messageCluster, namespaceName),
                               Topics.APOLLO_RELEASE_TOPIC);
     return BeanUtils.transform(ReleaseDTO.class, release);
@@ -179,6 +195,12 @@ public class ReleaseController {
 
   }
 
+  /**
+   * 回滚配置
+   * @param releaseId
+   * @param toReleaseId
+   * @param operator
+   */
   @Transactional
   @PutMapping("/releases/{releaseId}/rollback")
   public void rollback(@PathVariable("releaseId") long releaseId,
@@ -187,11 +209,14 @@ public class ReleaseController {
 
     Release release;
     if (toReleaseId > -1) {
+      // 回滚到指定release
       release = releaseService.rollbackTo(releaseId, toReleaseId, operator);
     } else {
+      // 回滚配置
       release = releaseService.rollback(releaseId, operator);
     }
 
+    // 回滚完配置之后需要重新发布
     String appId = release.getAppId();
     String clusterName = release.getClusterName();
     String namespaceName = release.getNamespaceName();

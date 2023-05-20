@@ -55,6 +55,14 @@ public class ItemSetService {
     return updateSet(namespace.getAppId(), namespace.getClusterName(), namespace.getNamespaceName(), changeSets);
   }
 
+  /**
+   * 根据ItemChangeSets更改命名空间的配置项
+   * @param appId           应用ID
+   * @param clusterName     集群名称
+   * @param namespaceName   命名空间名称
+   * @param changeSet       配置项
+   * @return
+   */
   @Transactional
   public ItemChangeSets updateSet(String appId, String clusterName,
                                   String namespaceName, ItemChangeSets changeSet) {
@@ -67,6 +75,7 @@ public class ItemSetService {
     String operator = changeSet.getDataChangeLastModifiedBy();
     ConfigChangeContentBuilder configChangeContentBuilder = new ConfigChangeContentBuilder();
 
+    // 根据changeSet中的CreateItems，UpdateItems，DeleteItems进行增，改，删
     if (!CollectionUtils.isEmpty(changeSet.getCreateItems())) {
       this.doCreateItems(changeSet.getCreateItems(), namespace, operator, configChangeContentBuilder);
       auditService.audit("ItemSet", null, Audit.OP.INSERT, operator);

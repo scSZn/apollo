@@ -47,6 +47,13 @@ public class NamespaceController {
     this.namespaceService = namespaceService;
   }
 
+  /**
+   * 创建命名空间
+   * @param appId       应用ID
+   * @param clusterName 集群名称
+   * @param dto         命名空间信息
+   * @return
+   */
   @PostMapping("/apps/{appId}/clusters/{clusterName}/namespaces")
   public NamespaceDTO create(@PathVariable("appId") String appId,
                              @PathVariable("clusterName") String clusterName,
@@ -74,6 +81,14 @@ public class NamespaceController {
     namespaceService.deleteNamespace(entity, operator);
   }
 
+  /**
+   * 查询指定应用，指定集群下的所有NamespaceDTO <br>
+   * 在 {@linkplain  com.ctrip.framework.apollo.portal.service.NamespaceService#findNamespaceBOs(String, com.ctrip.framework.apollo.portal.environment.Env, String, boolean)}
+   * 中用到
+   * @param appId         应用ID
+   * @param clusterName   集群名称
+   * @return
+   */
   @GetMapping("/apps/{appId}/clusters/{clusterName}/namespaces")
   public List<NamespaceDTO> find(@PathVariable("appId") String appId,
                                  @PathVariable("clusterName") String clusterName) {
@@ -127,6 +142,8 @@ public class NamespaceController {
   }
 
   /**
+   * 查询Namespace的发布情况
+   * @return Map，
    * cluster -> cluster has not published namespaces?
    */
   @GetMapping("/apps/{appId}/namespaces/publish_info")

@@ -124,15 +124,30 @@ public class AppService {
     appAPI.createApp(env, appDTO);
   }
 
+  /**
+   * 在Portal中创建APP信息
+   * <ol>
+   *     <li>
+   *        判断APP是否已经创建过了，如果有，则抛出异常。判断方式是通过APPID，appID的构成是 机构ID.应用ID 所以不同部门可以使用同一个应用ID
+   *     </li>
+   *     <li>
+   *         判断负责人是否存在
+   *     </li>
+   * </ol>
+   * @param app
+   * @return
+   */
   @Transactional
   public App createAppInLocal(App app) {
     String appId = app.getAppId();
+    // 1. 判断APP是否已经存在了
     App managedApp = appRepository.findByAppId(appId);
 
     if (managedApp != null) {
       throw BadRequestException.appAlreadyExists(appId);
     }
 
+    // 2. 判断负责人是否存在，存在则填写基础信息
     UserInfo owner = userService.findByUserId(app.getOwnerName());
     if (owner == null) {
       throw new BadRequestException("Application's owner not exist.");
@@ -145,7 +160,9 @@ public class AppService {
 
     App createdApp = appRepository.save(app);
 
+    // 3. 创建默认的Namespace
     appNamespaceService.createDefaultAppNamespace(appId);
+    // 4. 初始化APP角色信息
     roleInitializationService.initAppRoles(createdApp);
 
     Tracer.logEvent(TracerEventType.CREATE_APP, appId);

@@ -117,6 +117,11 @@ public class ItemService {
     return Collections.emptyList();
   }
 
+  /**
+   * 根据NamespaceId查询配置项，按照LineNum升序排序
+   * @param namespaceId
+   * @return
+   */
   public List<Item> findItemsWithOrdered(Long namespaceId) {
     List<Item> items = itemRepository.findByNamespaceIdOrderByLineNumAsc(namespaceId);
     if (items == null) {

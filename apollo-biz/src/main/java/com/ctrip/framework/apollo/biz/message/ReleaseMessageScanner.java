@@ -50,6 +50,7 @@ public class ReleaseMessageScanner implements InitializingBean {
   private int databaseScanInterval;
   private final List<ReleaseMessageListener> listeners;
   private final ScheduledExecutorService executorService;
+  // 存放那些发送失败的消息，key为发布消息ID，value为该记录持续被发布失败的次数
   private final Map<Long, Integer> missingReleaseMessages; // missing release message id => age counter
   private long maxIdScanned;
 
@@ -65,8 +66,11 @@ public class ReleaseMessageScanner implements InitializingBean {
 
   @Override
   public void afterPropertiesSet() throws Exception {
+    // 根据配置，获取到扫描数据库的间隔时间，毫秒级别
     databaseScanInterval = bizConfig.releaseMessageScanIntervalInMilli();
+    // 扫描发布消息表，获取到当前发布消息表中最大的ID
     maxIdScanned = loadLargestMessageId();
+    // 启动定时任务，定时扫描并发送消息
     executorService.scheduleWithFixedDelay(() -> {
       Transaction transaction = Tracer.newTransaction("Apollo.ReleaseMessageScanner", "scanMessage");
       try {
@@ -84,6 +88,9 @@ public class ReleaseMessageScanner implements InitializingBean {
   }
 
   /**
+   * <p>
+   *     添加消息监听器
+   * </p>
    * add message listeners for release message
    * @param listener
    */
@@ -94,6 +101,9 @@ public class ReleaseMessageScanner implements InitializingBean {
   }
 
   /**
+   * <p>
+   *     持续扫描消息，直到数据表中没有空余消息
+   * </p>
    * Scan messages, continue scanning until there is no more messages
    */
   private void scanMessages() {
@@ -104,17 +114,22 @@ public class ReleaseMessageScanner implements InitializingBean {
   }
 
   /**
+   * <p>
+   *     扫描消息记录表并发送消息
+   * </p>
    * scan messages and send
    *
    * @return whether there are more messages
    */
   private boolean scanAndSendMessages() {
+    // 获取到最新的500条发布消息
     //current batch is 500
     List<ReleaseMessage> releaseMessages =
         releaseMessageRepository.findFirst500ByIdGreaterThanOrderByIdAsc(maxIdScanned);
     if (CollectionUtils.isEmpty(releaseMessages)) {
       return false;
     }
+    // 发送消息
     fireMessageScanned(releaseMessages);
     int messageScanned = releaseMessages.size();
     long newMaxIdScanned = releaseMessages.get(messageScanned - 1).getId();
@@ -122,18 +137,26 @@ public class ReleaseMessageScanner implements InitializingBean {
     if (newMaxIdScanned - maxIdScanned > messageScanned) {
       recordMissingReleaseMessageIds(releaseMessages, maxIdScanned);
     }
+    // 更新最大ID
     maxIdScanned = newMaxIdScanned;
     return messageScanned == 500;
   }
 
+  /**
+   * 扫描那些遗漏的消息，并将其发送出去，触发监听器
+   */
   private void scanMissingMessages() {
     Set<Long> missingReleaseMessageIds = missingReleaseMessages.keySet();
+    // 获取到遗漏消息
     Iterable<ReleaseMessage> releaseMessages = releaseMessageRepository
         .findAllById(missingReleaseMessageIds);
+    // 发布那些遗漏的消息
     fireMessageScanned(releaseMessages);
+    // 移除遗漏消息
     releaseMessages.forEach(releaseMessage -> {
       missingReleaseMessageIds.remove(releaseMessage.getId());
     });
+    //
     growAndCleanMissingMessages();
   }
 
@@ -163,6 +186,9 @@ public class ReleaseMessageScanner implements InitializingBean {
   }
 
   /**
+   * <p>
+   *     获取到当前发布消息表中存在的最大ID
+   * </p>
    * find largest message id as the current start point
    * @return current largest message id
    */
@@ -172,6 +198,9 @@ public class ReleaseMessageScanner implements InitializingBean {
   }
 
   /**
+   * <p>
+   *     发送消息，触发监听器
+   * </p>
    * Notify listeners with messages loaded
    * @param messages
    */

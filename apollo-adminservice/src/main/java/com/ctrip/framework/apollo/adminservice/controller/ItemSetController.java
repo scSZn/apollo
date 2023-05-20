@@ -35,6 +35,14 @@ public class ItemSetController {
     this.itemSetService = itemSetService;
   }
 
+  /**
+   * 通过文本编辑的方式修改配置项的时候，会调用到这个接口进行更新配置
+   * @param appId             应用ID
+   * @param clusterName       集群名称
+   * @param namespaceName     命名空间
+   * @param changeSet         配置项
+   * @return
+   */
   @PreAcquireNamespaceLock
   @PostMapping("/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/itemset")
   public ResponseEntity<Void> create(@PathVariable String appId, @PathVariable String clusterName,

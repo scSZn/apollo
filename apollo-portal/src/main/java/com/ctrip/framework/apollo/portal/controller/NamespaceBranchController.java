@@ -40,6 +40,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 灰度相关Controller
+ */
 @RestController
 public class NamespaceBranchController {
 
@@ -76,6 +79,14 @@ public class NamespaceBranchController {
     return namespaceBO;
   }
 
+  /**
+   * 创建灰度分支
+   * @param appId           应用ID
+   * @param env             环境
+   * @param clusterName     集群名称
+   * @param namespaceName   命名空间
+   * @return
+   */
   @PreAuthorize(value = "@permissionValidator.hasModifyNamespacePermission(#appId, #namespaceName, #env)")
   @PostMapping(value = "/apps/{appId}/envs/{env}/clusters/{clusterName}/namespaces/{namespaceName}/branches")
   public NamespaceDTO createBranch(@PathVariable String appId,

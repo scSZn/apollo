@@ -58,6 +58,14 @@ public class ReleaseService {
     this.releaseAPI = releaseAPI;
   }
 
+  /**
+   * <p>
+   *     调用Admin服务，创建发布记录
+   * </p>
+   *
+   * @param model
+   * @return
+   */
   public ReleaseDTO publish(NamespaceReleaseModel model) {
     Env env = model.getEnv();
     boolean isEmergencyPublish = model.isEmergencyPublish();

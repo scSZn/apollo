@@ -101,6 +101,13 @@ public class NamespaceService {
     return namespaceRepository.findById(namespaceId).orElse(null);
   }
 
+  /**
+   * 查找Namespace
+   * @param appId           应用ID
+   * @param clusterName     集群名称
+   * @param namespaceName   命名空间名称
+   * @return
+   */
   public Namespace findOne(String appId, String clusterName, String namespaceName) {
     return namespaceRepository.findByAppIdAndClusterNameAndNamespaceName(appId, clusterName,
                                                                          namespaceName);
@@ -212,6 +219,12 @@ public class NamespaceService {
     return namespaceRepository.countByNamespaceNameAndAppIdNot(publicNamespaceName, publicAppNamespace.getAppId());
   }
 
+  /**
+   * 查询指定APP下，指定集群下的所有Namespace
+   * @param appId
+   * @param clusterName
+   * @return
+   */
   public List<Namespace> findNamespaces(String appId, String clusterName) {
     List<Namespace> namespaces = namespaceRepository.findByAppIdAndClusterNameOrderByIdAsc(appId, clusterName);
     if (namespaces == null) {
@@ -224,17 +237,33 @@ public class NamespaceService {
     return namespaceRepository.findByAppIdAndNamespaceNameOrderByIdAsc(appId, namespaceName);
   }
 
+  /**
+   * 查询指定Namespace在指定集群下的灰度版本
+   * <p>
+   *     关于Namespace灰度版本的数据结构，其实是通过Cluster来标识的。
+   *     当创建灰度Namespace的时候，实际上是创建了一个新的Cluster，这个Cluster的parentClusterId就是原Cluster的ID，
+   *     先称之为子Cluster，然后在这个子Cluster下创建一个新的Namespace。也就是说，这个灰度版本的Namespace其实是不知道自己是灰度分支
+   * </p>
+   * @param appId               应用ID
+   * @param parentClusterName   集群名称
+   * @param namespaceName       命名空间名称
+   * @return
+   */
   public Namespace findChildNamespace(String appId, String parentClusterName, String namespaceName) {
+    // 1. 根据应用ID和命名空间名称，查询出所有的Namespace
     List<Namespace> namespaces = findByAppIdAndNamespaceName(appId, namespaceName);
     if (CollectionUtils.isEmpty(namespaces) || namespaces.size() == 1) {
       return null;
     }
-
+    // 2. 然后根据应用ID和集群名称，查询该集群下所有的子集群
+    // 之前说了，每个Namespace都只能由一个对应的灰度版本，但是这里返回的是List<Cluster>，而不是只有一个Cluster
+    // 是因为虽然每个Namespace只能有一个灰度，但app下可以有多个Namespace，每个Namespace创建灰度版本的时候
+    // 都会创建一个对应的子集群。所以这里每个集群下最多可以有N的子集群，N为app添加的Namespace的数量
     List<Cluster> childClusters = clusterService.findChildClusters(appId, parentClusterName);
     if (CollectionUtils.isEmpty(childClusters)) {
       return null;
     }
-
+    // 3. 通过Namespace保存的集群名称，和子集群进行对比。找到对应的版本
     Set<String> childClusterNames = childClusters.stream().map(Cluster::getName).collect(Collectors.toSet());
     //the child namespace is the intersection of the child clusters and child namespaces
     for (Namespace namespace : namespaces) {
@@ -259,6 +288,11 @@ public class NamespaceService {
     return findParentNamespace(new Namespace(appId, clusterName, namespaceName));
   }
 
+  /**
+   * 查询该Namespace对应的父级Namespace
+   * @param namespace
+   * @return
+   */
   public Namespace findParentNamespace(Namespace namespace) {
     String appId = namespace.getAppId();
     String namespaceName = namespace.getNamespaceName();
@@ -344,6 +378,11 @@ public class NamespaceService {
     return deleted;
   }
 
+  /**
+   * 保存Namespace。也是正常的保存，没啥可说的
+   * @param entity
+   * @return
+   */
   @Transactional
   public Namespace save(Namespace entity) {
     if (!isNamespaceUnique(entity.getAppId(), entity.getClusterName(), entity.getNamespaceName())) {
@@ -358,6 +397,11 @@ public class NamespaceService {
     return namespace;
   }
 
+  /**
+   * 更新Namespace。正常的更新，没啥好说的
+   * @param namespace
+   * @return
+   */
   @Transactional
   public Namespace update(Namespace namespace) {
     Namespace managedNamespace = namespaceRepository.findByAppIdAndClusterNameAndNamespaceName(
@@ -371,6 +415,15 @@ public class NamespaceService {
     return managedNamespace;
   }
 
+  /**
+   * 根据AppNamespace表对App的某个集群创建相应的Namespace
+   * <p>
+   *     这里就是遍历指定APP的AppNamespace，依次创建Namespace
+   * </p>
+   * @param appId           应用ID
+   * @param clusterName     集群名称
+   * @param createBy        创建人
+   */
   @Transactional
   public void instanceOfAppNamespaces(String appId, String clusterName, String createBy) {
 
@@ -389,15 +442,22 @@ public class NamespaceService {
 
   }
 
+  /**
+   * 查询Namespace的发布情况
+   * @param appId   应用ID
+   * @return   Map，key为集群名称，value为该集群下的Namespace是否发布
+   */
   public Map<String, Boolean> namespacePublishInfo(String appId) {
+    // 1. 找到所有的非灰度版本的集群
     List<Cluster> clusters = clusterService.findParentClusters(appId);
     if (CollectionUtils.isEmpty(clusters)) {
       throw BadRequestException.appNotExists(appId);
     }
 
     Map<String, Boolean> clusterHasNotPublishedItems = Maps.newHashMap();
-
+    // 2. 遍历所有的集群，进行处理
     for (Cluster cluster : clusters) {
+      // 2.1 找到该集群下所有的Namespace
       String clusterName = cluster.getName();
       List<Namespace> namespaces = findNamespaces(appId, clusterName);
 
@@ -416,6 +476,11 @@ public class NamespaceService {
     return clusterHasNotPublishedItems;
   }
 
+  /**
+   * 判断该Namespace是否发布。在查询App下的Namespace发布信息的时候会用到
+   * @param namespace
+   * @return
+   */
   private boolean isNamespaceNotPublished(Namespace namespace) {
 
     Release latestRelease = releaseService.findLatestActiveRelease(namespace);

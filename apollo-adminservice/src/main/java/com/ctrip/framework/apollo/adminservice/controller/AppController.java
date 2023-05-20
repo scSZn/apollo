@@ -49,6 +49,11 @@ public class AppController {
     this.adminService = adminService;
   }
 
+  /**
+   * 创建APP，核心功能都在 {@link com.ctrip.framework.apollo.biz.service.AdminService#createNewApp(com.ctrip.framework.apollo.common.entity.App)}
+   * @param dto
+   * @return
+   */
   @PostMapping("/apps")
   public AppDTO create(@Valid @RequestBody AppDTO dto) {
     App entity = BeanUtils.transform(App.class, dto);
@@ -62,6 +67,11 @@ public class AppController {
     return BeanUtils.transform(AppDTO.class, entity);
   }
 
+  /**
+   * 删除指定APP
+   * @param appId
+   * @param operator
+   */
   @DeleteMapping("/apps/{appId:.+}")
   public void delete(@PathVariable("appId") String appId, @RequestParam String operator) {
     App entity = appService.findOne(appId);
@@ -71,6 +81,11 @@ public class AppController {
     adminService.deleteApp(entity, operator);
   }
 
+  /**
+   * 更新应用信息
+   * @param appId
+   * @param app
+   */
   @PutMapping("/apps/{appId:.+}")
   public void update(@PathVariable String appId, @RequestBody App app) {
     if (!Objects.equals(appId, app.getAppId())) {
@@ -80,6 +95,12 @@ public class AppController {
     appService.update(app);
   }
 
+  /**
+   * 根据名称查询APP。模糊查询
+   * @param name
+   * @param pageable
+   * @return
+   */
   @GetMapping("/apps")
   public List<AppDTO> find(@RequestParam(value = "name", required = false) String name,
                            Pageable pageable) {
@@ -92,6 +113,11 @@ public class AppController {
     return BeanUtils.batchTransform(AppDTO.class, app);
   }
 
+  /**
+   * 根据应用ID查询APP。精确查询
+   * @param appId
+   * @return
+   */
   @GetMapping("/apps/{appId:.+}")
   public AppDTO get(@PathVariable("appId") String appId) {
     App app = appService.findOne(appId);
@@ -101,6 +127,11 @@ public class AppController {
     return BeanUtils.transform(AppDTO.class, app);
   }
 
+  /**
+   * 判断该APPID是否被使用
+   * @param appId
+   * @return
+   */
   @GetMapping("/apps/{appId}/unique")
   public boolean isAppIdUnique(@PathVariable("appId") String appId) {
     return appService.isAppIdUnique(appId);

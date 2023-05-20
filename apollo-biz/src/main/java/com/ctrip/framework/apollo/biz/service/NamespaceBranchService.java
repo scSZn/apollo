@@ -60,29 +60,52 @@ public class NamespaceBranchService {
     this.releaseHistoryService = releaseHistoryService;
   }
 
+  /**
+   * 创建灰度分支
+   * @param appId               应用ID
+   * @param parentClusterName   集群名称
+   * @param namespaceName       命名空间名称
+   * @param operator            操作人
+   * @return
+   */
   @Transactional
   public Namespace createBranch(String appId, String parentClusterName, String namespaceName, String operator){
+    // 1. 首先判断当前Namespace是否已经有灰度版本了
+    // 每个Namespace只能有一个灰度分支
     Namespace childNamespace = findBranch(appId, parentClusterName, namespaceName);
     if (childNamespace != null){
       throw BadRequestException.namespaceNotExists(appId, parentClusterName, namespaceName);
     }
-
+    // 2. 查找集群
     Cluster parentCluster = clusterService.findOne(appId, parentClusterName);
     if (parentCluster == null || parentCluster.getParentClusterId() != 0) {
       throw BadRequestException.clusterNotExists(parentClusterName);
     }
 
+    // 3. 先创建一个子集群
     //create child cluster
     Cluster childCluster = createChildCluster(appId, parentCluster, namespaceName, operator);
 
     Cluster createdChildCluster = clusterService.saveWithoutInstanceOfAppNamespaces(childCluster);
 
+    // 4. 在新创建的子集群下创建对应的Namespace
+    // 可以看到，这里创建灰度Namespace的时候，不会复制原Namespace的配置项
     //create child namespace
     childNamespace = createNamespaceBranch(appId, createdChildCluster.getName(),
                                                         namespaceName, operator);
     return namespaceService.save(childNamespace);
   }
 
+  /**
+   * 查询指定Namespace在指定集群下的灰度版本
+   * <p>
+   *     因为每个Namespace只能有一个灰度版本，所以这里只返回了一个Namespace
+   * </p>
+   * @param appId
+   * @param parentClusterName
+   * @param namespaceName
+   * @return
+   */
   public Namespace findBranch(String appId, String parentClusterName, String namespaceName) {
     return namespaceService.findChildNamespace(appId, parentClusterName, namespaceName);
   }

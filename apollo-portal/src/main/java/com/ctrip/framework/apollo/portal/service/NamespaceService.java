@@ -184,18 +184,22 @@ public class NamespaceService {
   }
 
   /**
+   * 查询某个集群下的所有Namespace
    * load cluster all namespace info with items
    */
   public List<NamespaceBO> findNamespaceBOs(String appId, Env env, String clusterName, boolean includeDeletedItems) {
-
+    // 1. 调用Admin服务，查询符合条件所有的Namespace
     List<NamespaceDTO> namespaces = namespaceAPI.findNamespaceByCluster(appId, env, clusterName);
     if (namespaces == null || namespaces.size() == 0) {
       throw BadRequestException.namespaceNotExists();
     }
-
+    // namespaceBOs 转换完成的NamespaceBO
     List<NamespaceBO> namespaceBOs = Collections.synchronizedList(new LinkedList<>());
+    // exceptionNamespaces 转换失败的NamespaceBO
     List<String> exceptionNamespaces = Collections.synchronizedList(new LinkedList<>());
     CountDownLatch latch = new CountDownLatch(namespaces.size());
+
+    // 2. 遍历namespaces，将其转为 NamespaceBO
     for (NamespaceDTO namespace : namespaces) {
       executorService.submit(() -> {
         NamespaceBO namespaceBO;
@@ -300,7 +304,7 @@ public class NamespaceService {
     String appId = namespace.getAppId();
     String clusterName = namespace.getClusterName();
     String namespaceName = namespace.getNamespaceName();
-
+    // 填充AppNamespace中的信息
     fillAppNamespaceProperties(namespaceBO);
 
     List<ItemBO> itemBOs = new LinkedList<>();
@@ -351,6 +355,10 @@ public class NamespaceService {
     return transformNamespace2BO(env, namespace, true);
   }
 
+  /**
+   * 填充AppNamespace中的信息，主要是格式format和是否公共配置 isPublic
+   * @param namespace
+   */
   private void fillAppNamespaceProperties(NamespaceBO namespace) {
 
     final NamespaceDTO namespaceDTO = namespace.getBaseInfo();

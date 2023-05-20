@@ -63,6 +63,11 @@ public class ClusterService {
     return clusterRepository.findById(clusterId).orElse(null);
   }
 
+  /**
+   * 查询所有非灰度版本创建的集群
+   * @param appId
+   * @return
+   */
   public List<Cluster> findParentClusters(String appId) {
     if (Strings.isNullOrEmpty(appId)) {
       return Collections.emptyList();
@@ -78,17 +83,30 @@ public class ClusterService {
     return clusters;
   }
 
+  /**
+   * 创建集群，并根据App的Namespace模板创建对应的Namespace
+   * @param entity
+   * @return
+   */
   @Transactional
   public Cluster saveWithInstanceOfAppNamespaces(Cluster entity) {
-
+    // 1. 先创建集群
     Cluster savedCluster = saveWithoutInstanceOfAppNamespaces(entity);
 
+    // 2. 根据应用Namespace模板在该集群下创建对应的Namespace
     namespaceService.instanceOfAppNamespaces(savedCluster.getAppId(), savedCluster.getName(),
                                              savedCluster.getDataChangeCreatedBy());
 
     return savedCluster;
   }
 
+  /**
+   * 不根据App的命名空间模板，即 AppNamespace 的数据创建集群 <br/>
+   * AppNamespace可以认为是App的命名空间模板，它保存了App下应有的Namespace信息，在创建App的时候会默认创建一个模板 <br/>
+   * {@link AppNamespaceService#createDefaultAppNamespace(String, String)}
+   * @param entity
+   * @return
+   */
   @Transactional
   public Cluster saveWithoutInstanceOfAppNamespaces(Cluster entity) {
     if (!isClusterNameUnique(entity.getAppId(), entity.getName())) {
@@ -103,6 +121,13 @@ public class ClusterService {
     return cluster;
   }
 
+  /**
+   * 删除指定的集群，同时会删除该集群下所有的Namespace<br>
+   * 这里是通过集群名称来进行删除的 {@link NamespaceService#deleteByAppIdAndClusterName(String, String, String)}
+   * 所以就算是产生的灰度 NameSpace，也能被删除
+   * @param id
+   * @param operator
+   */
   @Transactional
   public void delete(long id, String operator) {
     Cluster cluster = clusterRepository.findById(id).orElse(null);
@@ -133,6 +158,11 @@ public class ClusterService {
     return managedCluster;
   }
 
+  /**
+   * 创建默认的集群。一般在创建新的App的时候使用
+   * @param appId
+   * @param createBy
+   */
   @Transactional
   public void createDefaultCluster(String appId, String createBy) {
     if (!isClusterNameUnique(appId, ConfigConsts.CLUSTER_NAME_DEFAULT)) {

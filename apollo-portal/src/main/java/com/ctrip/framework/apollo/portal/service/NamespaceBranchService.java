@@ -60,15 +60,32 @@ public class NamespaceBranchService {
     this.releaseService = releaseService;
   }
 
-
+  /**
+   * 创建灰度分支
+   * @param appId               应用ID
+   * @param env                 环境
+   * @param parentClusterName   集群名称
+   * @param namespaceName       命名空间名称
+   * @return
+   */
   @Transactional
   public NamespaceDTO createBranch(String appId, Env env, String parentClusterName, String namespaceName) {
     String operator = userInfoHolder.getUser().getUserId();
     return createBranch(appId, env, parentClusterName, namespaceName, operator);
   }
 
+  /**
+   * 创建灰度分支
+   * @param appId               应用ID
+   * @param env                 环境
+   * @param parentClusterName   集群名称
+   * @param namespaceName       命名空间名称
+   * @param operator            操作人
+   * @return
+   */
   @Transactional
   public NamespaceDTO createBranch(String appId, Env env, String parentClusterName, String namespaceName, String operator) {
+    // 调用Admin服务创建灰度分支
     NamespaceDTO createdBranch = namespaceBranchAPI.createBranch(appId, env, parentClusterName, namespaceName,
             operator);
 

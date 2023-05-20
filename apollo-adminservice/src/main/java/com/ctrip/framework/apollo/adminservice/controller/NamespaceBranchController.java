@@ -55,15 +55,27 @@ public class NamespaceBranchController {
     this.namespaceService = namespaceService;
   }
 
-
+  /**
+   * 创建灰度分支
+   * <p>
+   *     关于Namespace灰度版本的数据结构，其实是通过Cluster来标识的。
+   *     当创建灰度Namespace的时候，实际上是创建了一个新的Cluster，这个Cluster的parentClusterId就是原Cluster的ID，
+   *     先称之为子Cluster，然后在这个子Cluster下创建一个新的Namespace。也就是说，这个灰度版本的Namespace其实是不知道自己是灰度分支
+   * </p>
+   * @param appId           应用ID
+   * @param clusterName     集群名称
+   * @param namespaceName   命名空间名称
+   * @param operator        操作人名称
+   * @return
+   */
   @PostMapping("/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/branches")
   public NamespaceDTO createBranch(@PathVariable String appId,
                                    @PathVariable String clusterName,
                                    @PathVariable String namespaceName,
                                    @RequestParam("operator") String operator) {
-
+    // 1. 判断命名空间是否存在
     checkNamespace(appId, clusterName, namespaceName);
-
+    // 2. 创建灰度分支
     Namespace createdBranch = namespaceBranchService.createBranch(appId, clusterName, namespaceName, operator);
 
     return BeanUtils.transform(NamespaceDTO.class, createdBranch);

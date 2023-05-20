@@ -43,16 +43,25 @@ public class ClusterController {
     this.clusterService = clusterService;
   }
 
+  /**
+   * 创建集群
+   * @param appId                         对哪个APP进行创建集群
+   * @param autoCreatePrivateNamespace    是否根据AppNamespace自动创建私有Namespace
+   * @param dto                           集群相关信息
+   * @return
+   */
   @PostMapping("/apps/{appId}/clusters")
   public ClusterDTO create(@PathVariable("appId") String appId,
                            @RequestParam(value = "autoCreatePrivateNamespace", defaultValue = "true") boolean autoCreatePrivateNamespace,
                            @Valid @RequestBody ClusterDTO dto) {
     Cluster entity = BeanUtils.transform(Cluster.class, dto);
+    // 1. 判断集群是否重复了。每个App下的集群名称必须唯一
     Cluster managedEntity = clusterService.findOne(appId, entity.getName());
     if (managedEntity != null) {
       throw BadRequestException.clusterAlreadyExists(entity.getName());
     }
 
+    // 2. 根据是否自动创建相应的Namespace调用不同的方法
     if (autoCreatePrivateNamespace) {
       entity = clusterService.saveWithInstanceOfAppNamespaces(entity);
     } else {
@@ -62,6 +71,12 @@ public class ClusterController {
     return BeanUtils.transform(ClusterDTO.class, entity);
   }
 
+  /**
+   * 删除集群。不允许删除默认集群，默认集群只有在删除APP的时候一起删除
+   * @param appId
+   * @param clusterName
+   * @param operator
+   */
   @DeleteMapping("/apps/{appId}/clusters/{clusterName:.+}")
   public void delete(@PathVariable("appId") String appId,
                      @PathVariable("clusterName") String clusterName, @RequestParam String operator) {
@@ -79,12 +94,23 @@ public class ClusterController {
     clusterService.delete(entity.getId(), operator);
   }
 
+  /**
+   * 查询指定APP下的所有集群。注意是非灰度版本的集群
+   * @param appId   APPID
+   * @return
+   */
   @GetMapping("/apps/{appId}/clusters")
   public List<ClusterDTO> find(@PathVariable("appId") String appId) {
     List<Cluster> clusters = clusterService.findParentClusters(appId);
     return BeanUtils.batchTransform(ClusterDTO.class, clusters);
   }
 
+  /**
+   * 查询指定APP的指定集群名称的集群信息。这里的集群名称是精确匹配
+   * @param appId
+   * @param clusterName
+   * @return
+   */
   @GetMapping("/apps/{appId}/clusters/{clusterName:.+}")
   public ClusterDTO get(@PathVariable("appId") String appId,
                         @PathVariable("clusterName") String clusterName) {
@@ -95,6 +121,12 @@ public class ClusterController {
     return BeanUtils.transform(ClusterDTO.class, cluster);
   }
 
+  /**
+   * 判断该集群名称在其应用中是否唯一
+   * @param appId
+   * @param clusterName
+   * @return
+   */
   @GetMapping("/apps/{appId}/cluster/{clusterName}/unique")
   public boolean isAppIdUnique(@PathVariable("appId") String appId,
                                @PathVariable("clusterName") String clusterName) {

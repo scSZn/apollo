@@ -79,6 +79,9 @@ public class ItemService {
 
 
   /**
+   * <p>
+   *     解析传入的文本，转换为对应的配置结果，存储在item表中
+   * </p>
    * parse config text and update config items
    *
    * @return parse result
@@ -89,6 +92,7 @@ public class ItemService {
     String clusterName = model.getClusterName();
     String namespaceName = model.getNamespaceName();
 
+    // 1. 请求Admin服务，获取到对应的Namespace，及其下属的items
     NamespaceDTO namespace = namespaceAPI.loadNamespace(appId, env, clusterName, namespaceName);
     if (namespace == null) {
       throw BadRequestException.namespaceNotExists(appId, clusterName, namespaceName);
@@ -100,6 +104,7 @@ public class ItemService {
       throw BadRequestException.namespaceNotExists();
     }
 
+    // 2. 解析文本，得到新增，修改，删除的item
     String configText = model.getConfigText();
 
     ConfigTextResolver resolver =
@@ -117,6 +122,7 @@ public class ItemService {
     }
     changeSets.setDataChangeLastModifiedBy(operator);
 
+    // 3. 调用Admin服务，应用修改后的数据
     updateItems(appId, env, clusterName, namespaceName, changeSets);
 
     Tracer.logEvent(TracerEventType.MODIFY_NAMESPACE_BY_TEXT,

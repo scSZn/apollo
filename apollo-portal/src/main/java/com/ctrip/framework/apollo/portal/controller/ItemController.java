@@ -73,6 +73,14 @@ public class ItemController {
     this.namespaceService = namespaceService;
   }
 
+  /**
+   * 通过文本格式修改了配置，当通过文本编辑修改命名空间的配置项的时候，会调用这个接口进行修改
+   * @param appId           应用ID
+   * @param env             环境
+   * @param clusterName     集群
+   * @param namespaceName   命名空间名称
+   * @param model           参数实体
+   */
   @PreAuthorize(value = "@permissionValidator.hasModifyNamespacePermission(#appId, #namespaceName, #env)")
   @PutMapping(value = "/apps/{appId}/envs/{env}/clusters/{clusterName}/namespaces/{namespaceName}/items", consumes = {
       "application/json"})

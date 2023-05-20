@@ -63,6 +63,11 @@ import java.util.stream.Collectors;
 
 import static com.ctrip.framework.apollo.common.utils.RequestPrecondition.checkModel;
 
+/**
+ * <p>
+ *     命名空间
+ * </p>
+ */
 @RestController
 public class NamespaceController {
 
@@ -96,12 +101,22 @@ public class NamespaceController {
     this.namespaceAPI = namespaceAPI;
   }
 
-
+  /**
+   * 查询所有公共AppNamespace
+   * @return
+   */
   @GetMapping("/appnamespaces/public")
   public List<AppNamespace> findPublicAppNamespaces() {
     return appNamespaceService.findPublicAppNamespaces();
   }
 
+  /**
+   * 查询某个应用，某个环境，某个集群下的Namespace
+   * @param appId         应用ID
+   * @param env           环境
+   * @param clusterName   集群名称
+   * @return
+   */
   @GetMapping("/apps/{appId}/envs/{env}/clusters/{clusterName}/namespaces")
   public List<NamespaceBO> findNamespaces(@PathVariable String appId, @PathVariable String env,
                                           @PathVariable String clusterName) {
@@ -117,12 +132,21 @@ public class NamespaceController {
     return namespaceBOs;
   }
 
+  /**
+   * 查询Namespace
+   * @param appId             APPID
+   * @param env               环境信息
+   * @param clusterName       集群信息
+   * @param namespaceName     Namespace名称。精确匹配
+   * @return
+   */
   @GetMapping("/apps/{appId}/envs/{env}/clusters/{clusterName}/namespaces/{namespaceName:.+}")
   public NamespaceBO findNamespace(@PathVariable String appId, @PathVariable String env,
                                    @PathVariable String clusterName, @PathVariable String namespaceName) {
-
+    // 从数据库中查询Namespace信息
     NamespaceBO namespaceBO = namespaceService.loadNamespaceBO(appId, Env.valueOf(env), clusterName, namespaceName);
 
+    // 根据是否需要展示配置信息，对Namespace进行过滤
     if (namespaceBO != null && permissionValidator.shouldHideConfigToCurrentUser(appId, env, namespaceName)) {
       namespaceBO.hideItems();
     }
@@ -139,6 +163,25 @@ public class NamespaceController {
     return namespaceService.findPublicNamespaceForAssociatedNamespace(Env.valueOf(env), appId, clusterName, namespaceName);
   }
 
+  /**
+   * <p>
+   *  创建命名空间，该接口不会按照AppNamespace创建。<br/>
+   *  一般来说，在Portal界面上创建命名空间，其工作有两部分。
+   *  <ol>
+   *      <li>
+   *          为应用创建对应的AppNamespace数据，一边后续创建新的集群的时候，可以从中创建出一致的Namespace
+   *      </li>
+   *      <li>
+   *          为应用下已经创建的集群创建出对应的Namespace
+   *      </li>
+   *  </ol>
+   *  上述工作是在 {@link NamespaceController#createAppNamespace(String, boolean, com.ctrip.framework.apollo.common.entity.AppNamespace)}
+   *  这个接口中完成的<br>
+   * </p>
+   * @param appId   给哪个APP创建命名空间
+   * @param models  创建命名空间的模型
+   * @return
+   */
   @PreAuthorize(value = "@permissionValidator.hasCreateNamespacePermission(#appId)")
   @PostMapping("/apps/{appId}/namespaces")
   public ResponseEntity<Void> createNamespace(@PathVariable String appId,
@@ -149,13 +192,20 @@ public class NamespaceController {
 
     for (NamespaceCreationModel model : models) {
       String namespaceName = model.getNamespace().getNamespaceName();
+      // initNamespaceRoles 用于初始化与环境无关的角色权限
       roleInitializationService.initNamespaceRoles(appId, namespaceName, operator);
+      // initNamespaceEnvRoles 用于初始化与环境相关的角色权限，用于更细粒度的权限控制
       roleInitializationService.initNamespaceEnvRoles(appId, namespaceName, operator);
       NamespaceDTO namespace = model.getNamespace();
+      // 校验数据
       RequestPrecondition.checkArgumentsNotEmpty(model.getEnv(), namespace.getAppId(),
                                                  namespace.getClusterName(), namespace.getNamespaceName());
 
       try {
+        /**
+         * 调用实际的 {@link com.ctrip.framework.apollo.portal.service.NamespaceService#createNamespace(com.ctrip.framework.apollo.portal.environment.Env, com.ctrip.framework.apollo.common.dto.NamespaceDTO)}
+         * 创建命名空间
+         */
         namespaceService.createNamespace(Env.valueOf(model.getEnv()), namespace);
       } catch (Exception e) {
         logger.error("create namespace fail.", e);
@@ -163,6 +213,7 @@ public class NamespaceController {
                 String.format("create namespace fail. (env=%s namespace=%s)", model.getEnv(),
                         namespace.getNamespaceName()), e);
       }
+      // 将该namespace相关的权限授权给当前操作人。即前面init出来的权限。非环境相关的
       namespaceService.assignNamespaceRoleToOperator(appId, namespaceName,userInfoHolder.getUser().getUserId());
     }
 
@@ -213,6 +264,23 @@ public class NamespaceController {
     return BeanUtils.transform(AppNamespaceDTO.class, appNamespace);
   }
 
+  /**
+   * 真正的创建Namespace的接口
+   * <ol>
+   *     <li>
+   *         先在本地创建AppNamespace。{@link com.ctrip.framework.apollo.portal.service.AppNamespaceService#createAppNamespaceInLocal(com.ctrip.framework.apollo.common.entity.AppNamespace, boolean)}
+   *     </li>
+   *     <li>
+   *         通过事件机制，通知Admin也创建对应的AppNamespace<br>
+   *         发布事件：{@link com.ctrip.framework.apollo.portal.listener.AppNamespaceCreationEvent} <br>
+   *         接收事件：{@link com.ctrip.framework.apollo.portal.listener.CreationListener#onAppNamespaceCreationEvent(com.ctrip.framework.apollo.portal.listener.AppNamespaceCreationEvent)}
+   *     </li>
+   * </ol>
+   * @param appId                     应用ID
+   * @param appendNamespacePrefix     是否添加命名空间前缀
+   * @param appNamespace              创建命名空间的实体
+   * @return
+   */
   @PreAuthorize(value = "@permissionValidator.hasCreateAppNamespacePermission(#appId, #appNamespace)")
   @PostMapping("/apps/{appId}/appnamespaces")
   public AppNamespace createAppNamespace(@PathVariable String appId,

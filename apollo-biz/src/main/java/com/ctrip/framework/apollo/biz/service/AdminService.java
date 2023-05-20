@@ -48,6 +48,25 @@ public class AdminService {
     this.namespaceService = namespaceService;
   }
 
+  /**
+   * 创建一个新的APP
+   * <ol>
+   *     <li>
+   *         创建APP {@link AppService#save(com.ctrip.framework.apollo.common.entity.App)}
+   *     </li>
+   *     <li>
+   *         创建默认的AppNamespace模板 {@link AppNamespaceService#createDefaultAppNamespace(String, String)}
+   *     </li>
+   *     <li>
+   *         创建默认的集群default {@link ClusterService#createDefaultCluster(String, String)}
+   *     </li>
+   *     <li>
+   *         根据 AppNamespace 模板创建对应的 Namespace {@link NamespaceService#instanceOfAppNamespaces(String, String, String)}
+   *     </li>
+   * </ol>
+   * @param app
+   * @return
+   */
   @Transactional
   public App createNewApp(App app) {
     String createBy = app.getDataChangeCreatedBy();
@@ -64,6 +83,24 @@ public class AdminService {
     return app;
   }
 
+  /**
+   * 删除APP
+   * <ol>
+   *     <li>
+   *         查询到所有的集群，然后挨个删除这些集群及其相关的Namespace {@link ClusterService#findParentClusters(String)} <br/>
+   *         注意，这里是删除的主集群。关于这个主集群，参见 <a href="https://www.cnblogs.com/deepSleeping/p/14565804.html">深入理解Apollo核心机制之灰度发布——创建灰度</a>
+   *     </li>
+   *     <li>
+   *        删除该应用下所有的Namespace模板 即AppNamespace {@link AppNamespaceService#batchDelete(String, String)}
+   *     </li>
+   *     <li>
+   *         最后删除APP {@link AppService#delete(long, String)}
+   *     </li>
+   * </ol>
+   *
+   * @param app       要删除的APP
+   * @param operator  操作人
+   */
   @Transactional
   public void deleteApp(App app, String operator) {
     String appId = app.getAppId();

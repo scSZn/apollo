@@ -20,5 +20,11 @@ package com.ctrip.framework.apollo.biz.message;
  * @author Jason Song(song_s@ctrip.com)
  */
 public interface MessageSender {
+
+  /**
+   * 发送发布消息
+   * @param message   消息内容，一般是  appid,clusterName,namespaceName
+   * @param channel   发送给哪个渠道，类似于kafka的Topic，目前仅有{@link Topics#APOLLO_RELEASE_TOPIC}
+   */
   void sendMessage(String message, String channel);
 }

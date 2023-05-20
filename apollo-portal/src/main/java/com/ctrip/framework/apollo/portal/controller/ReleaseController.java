@@ -69,6 +69,15 @@ public class ReleaseController {
     this.userInfoHolder = userInfoHolder;
   }
 
+  /**
+   * 发布Namespace
+   * @param appId         应用ID
+   * @param env           环境
+   * @param clusterName   集群
+   * @param namespaceName 命名空间
+   * @param model         release的实体
+   * @return
+   */
   @PreAuthorize(value = "@permissionValidator.hasReleaseNamespacePermission(#appId, #namespaceName, #env)")
   @PostMapping(value = "/apps/{appId}/envs/{env}/clusters/{clusterName}/namespaces/{namespaceName}/releases")
   public ReleaseDTO createRelease(@PathVariable String appId,
@@ -79,6 +88,7 @@ public class ReleaseController {
     model.setClusterName(clusterName);
     model.setNamespaceName(namespaceName);
 
+    // 1. 判断是否是紧急发布，并判断配置中是否支持紧急发布
     if (model.isEmergencyPublish() && !portalConfig.isEmergencyPublishAllowed(Env.valueOf(env))) {
       throw new BadRequestException("Env: %s is not supported emergency publish now", env);
     }
@@ -176,27 +186,36 @@ public class ReleaseController {
     return releaseService.compare(Env.valueOf(env), baseReleaseId, toCompareReleaseId);
   }
 
-
+  /**
+   * 回滚发布
+   * @param env           环境
+   * @param releaseId     现在的releaseId
+   * @param toReleaseId   回滚到哪个releaseId
+   */
   @PutMapping(path = "/envs/{env}/releases/{releaseId}/rollback")
   public void rollback(@PathVariable String env,
                        @PathVariable long releaseId,
                        @RequestParam(defaultValue = "-1") long toReleaseId) {
+    // 1. 先找到当前版本的发布信息
     ReleaseDTO release = releaseService.findReleaseById(Env.valueOf(env), releaseId);
 
     if (release == null) {
       throw NotFoundException.releaseNotFound(releaseId);
     }
 
+    // 2. 判断权限
     if (!permissionValidator.hasReleaseNamespacePermission(release.getAppId(), release.getNamespaceName(), env)) {
       throw new AccessDeniedException("Access is denied");
     }
 
+    // 3. 根据回滚目标releaseId，回滚配置
     if (toReleaseId > -1) {
       releaseService.rollbackTo(Env.valueOf(env), releaseId, toReleaseId, userInfoHolder.getUser().getUserId());
     } else {
       releaseService.rollback(Env.valueOf(env), releaseId, userInfoHolder.getUser().getUserId());
     }
 
+    // 4. 最后，发布配置
     ConfigPublishEvent event = ConfigPublishEvent.instance();
     event.withAppId(release.getAppId())
         .withCluster(release.getClusterName())

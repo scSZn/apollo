@@ -64,7 +64,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-
+/**
+ * <p>
+ *     对于APP的管理，会在Portal服务和Portal管理的所有环境的AdminService中同步数据
+ * </p>
+ */
 @RestController
 @RequestMapping("/apps")
 public class AppController {
@@ -147,7 +151,7 @@ public class AppController {
   /**
    * 创建APP，分为两步骤<br/>
    * <ol>
-   *     <li>在本地数据库保存APP信息</li>
+   *     <li>在本地数据库保存APP信息，{@link com.ctrip.framework.apollo.portal.service.AppService#createAppInLocal(com.ctrip.framework.apollo.common.entity.App)}</li>
    *     <li>发送消息，通过消息异步的将App信息发送给AdminService，让它保存APP，见{@link com.ctrip.framework.apollo.portal.listener.CreationListener}和{@link com.ctrip.framework.apollo.portal.api.AdminServiceAPI.AppAPI}</li>
    *     <li>给所选的APP管理员授权</li>
    * </ol>
@@ -169,6 +173,8 @@ public class AppController {
 
     Set<String> admins = appModel.getAdmins();
     if (!CollectionUtils.isEmpty(admins)) {
+      // 给选中的管理员进行授权，roleName名称本身就代表了资源
+      // 这里的APP管理的roleName 形如  Master+test1.appid  1=APPID
       rolePermissionService
           .assignRoleToUsers(RoleUtils.buildAppMasterRoleName(createdApp.getAppId()),
               admins, userInfoHolder.getUser().getUserId());
@@ -271,8 +277,10 @@ public class AppController {
   }
 
   /**
-   * 查询该APP在哪个环境中不存在，可能是创建失败，或者是后来接入的环境<br/>
-   * 该API的实现是通过遍历所有的env，尝试去对应的AdminService获取APP信息，如果没有获取到（404），则说明在该环境中没有创建成功
+   * 查询该APP在哪个环境中不存在，可能是创建失败，或者是后来接入的环境。这个接口主要用于补偿APP创建失败的情况
+   * <p>
+   *     实现方式：该API的实现是通过遍历所有的env，尝试去对应的AdminService获取APP信息，如果没有获取到（404），则说明在该环境中没有创建成功
+   * </p>
    *
    * @param appId 指定APP的ID
    * @return
