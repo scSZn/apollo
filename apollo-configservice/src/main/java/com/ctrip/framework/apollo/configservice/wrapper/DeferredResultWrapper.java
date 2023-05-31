@@ -36,6 +36,12 @@ public class DeferredResultWrapper implements Comparable<DeferredResultWrapper> 
   private static final ResponseEntity<List<ApolloConfigNotification>>
       NOT_MODIFIED_RESPONSE_LIST = new ResponseEntity<>(HttpStatus.NOT_MODIFIED);
 
+  /**
+   * key：一个Namespace的标准名称 <br>
+   * value: Namespace的原来的名称 <br>
+   * 这个map作用是，如果这个Namespace的名称变更了，客户端那边是不知晓的，仍然会传递旧的Namespace。
+   * 而且客户端是根据 Namespace的名称来识别的，因此在返回的时候，需要用旧的Namespace返回给客户端
+   */
   private Map<String, String> normalizedNamespaceNameToOriginalNamespaceName;
   private DeferredResult<ResponseEntity<List<ApolloConfigNotification>>> result;
 

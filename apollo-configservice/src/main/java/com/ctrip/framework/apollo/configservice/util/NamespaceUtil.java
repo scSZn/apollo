@@ -41,6 +41,12 @@ public class NamespaceUtil {
     return namespaceName;
   }
 
+  /**
+   * 将给定的命名空间名称进行标准化。即查询AppNamespace表，返回表中的标准Namespace名称
+   * @param appId
+   * @param namespaceName
+   * @return
+   */
   public String normalizeNamespace(String appId, String namespaceName) {
     AppNamespace appNamespace = appNamespaceServiceWithCache.findByAppIdAndNamespace(appId, namespaceName);
     if (appNamespace != null) {

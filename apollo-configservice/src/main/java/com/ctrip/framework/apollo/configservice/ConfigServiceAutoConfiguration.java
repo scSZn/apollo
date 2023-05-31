@@ -123,6 +123,7 @@ public class ConfigServiceAutoConfiguration {
     public ReleaseMessageScanner releaseMessageScanner() {
       ReleaseMessageScanner releaseMessageScanner = new ReleaseMessageScanner(bizConfig,
           releaseMessageRepository);
+      // 发布消息的缓存
       //0. handle release message cache
       releaseMessageScanner.addMessageListener(releaseMessageServiceWithCache);
       //1. handle gray release rule

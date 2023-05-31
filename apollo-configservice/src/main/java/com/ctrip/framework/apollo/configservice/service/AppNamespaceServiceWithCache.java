@@ -46,6 +46,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * <p>带缓存的AppNamespace服务</p>
  * @author Jason Song(song_s@ctrip.com)
  */
 @Service
@@ -131,8 +132,11 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
 
   @Override
   public void afterPropertiesSet() throws Exception {
+    // 1. 填充数据库配置
     populateDataBaseInterval();
+    // 2. 启动的时候先扫描一次
     scanNewAppNamespaces(); //block the startup process until load finished
+    // 3. 启动定时任务，定时重建缓存，这里重建是完全重建
     scheduledExecutorService.scheduleAtFixedRate(() -> {
       Transaction transaction = Tracer.newTransaction("Apollo.AppNamespaceServiceWithCache",
           "rebuildCache");
@@ -146,14 +150,19 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
         transaction.complete();
       }
     }, rebuildInterval, rebuildInterval, rebuildIntervalTimeUnit);
+    // 4. 启动定时任务，定时将新增的AppNamespace添加到缓存中
     scheduledExecutorService.scheduleWithFixedDelay(this::scanNewAppNamespaces, scanInterval,
         scanInterval, scanIntervalTimeUnit);
   }
 
+  /**
+   * 扫描新的 AppNamespace。注意是新的，这里只扫描新增加的AppNamespace，如果是删除的话，这个函数不会处理
+   */
   private void scanNewAppNamespaces() {
     Transaction transaction = Tracer.newTransaction("Apollo.AppNamespaceServiceWithCache",
         "scanNewAppNamespaces");
     try {
+      // 加载AppNamespace
       this.loadNewAppNamespaces();
       transaction.setStatus(Transaction.SUCCESS);
     } catch (Throwable ex) {
@@ -164,9 +173,13 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
     }
   }
 
+  /**
+   * 加载AppNamespace。批量扫描数据库中 AppNamespace表，将其全量缓存到本缓存中
+   */
   //for those new app namespaces
   private void loadNewAppNamespaces() {
     boolean hasMore = true;
+    // 每次扫描500条AppNamespace入缓存
     while (hasMore && !Thread.currentThread().isInterrupted()) {
       //current batch is 500
       List<AppNamespace> appNamespaces = appNamespaceRepository
@@ -174,14 +187,20 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
       if (CollectionUtils.isEmpty(appNamespaces)) {
         break;
       }
+      // 将查询到的AppNamespaces添加到当前缓存中
       mergeAppNamespaces(appNamespaces);
       int scanned = appNamespaces.size();
+      // 更新当前扫描的最大ID值
       maxIdScanned = appNamespaces.get(scanned - 1).getId();
       hasMore = scanned == 500;
       logger.info("Loaded {} new app namespaces with startId {}", scanned, maxIdScanned);
     }
   }
 
+  /**
+   * 将这些AppNamespace填充到当前缓存中
+   * @param appNamespaces
+   */
   private void mergeAppNamespaces(List<AppNamespace> appNamespaces) {
     for (AppNamespace appNamespace : appNamespaces) {
       appNamespaceCache.put(assembleAppNamespaceKey(appNamespace), appNamespace);
@@ -192,12 +211,17 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
     }
   }
 
+  /**
+   * 这里是完全重建AppNamespace缓存的逻辑
+   */
   //for those updated or deleted app namespaces
   private void updateAndDeleteCache() {
+    // 1. 这里先获取到当前缓存的所有AppNamespace的ID
     List<Long> ids = Lists.newArrayList(appNamespaceIdCache.keySet());
     if (CollectionUtils.isEmpty(ids)) {
       return;
     }
+    // 2. 这里回去数据库中查询这些ID的数据，进行删除和更新
     List<List<Long>> partitionIds = Lists.partition(ids, 500);
     for (List<Long> toRebuild : partitionIds) {
       Iterable<AppNamespace> appNamespaces = appNamespaceRepository.findAllById(toRebuild);
@@ -206,32 +230,44 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
         continue;
       }
 
+      // 2.1 进行更新
       //handle updated
       Set<Long> foundIds = handleUpdatedAppNamespaces(appNamespaces);
 
+      // 2.2 进行删除
       //handle deleted
       handleDeletedAppNamespaces(Sets.difference(Sets.newHashSet(toRebuild), foundIds));
     }
   }
 
+  /**
+   * 更新 AppNamespace 缓存
+   * @param appNamespaces
+   * @return 返回数据库中有的AppNamespace的ID，后续会将那些被删除的AppNamespace（即数据库中不存在的AppNamespace）给
+   */
   //for those updated app namespaces
   private Set<Long> handleUpdatedAppNamespaces(Iterable<AppNamespace> appNamespaces) {
     Set<Long> foundIds = Sets.newHashSet();
     for (AppNamespace appNamespace : appNamespaces) {
       foundIds.add(appNamespace.getId());
+      // 1. 取出在缓存中的AppNamespace
       AppNamespace thatInCache = appNamespaceIdCache.get(appNamespace.getId());
+      // 判断是否需要进行更新。如果thatInCache为空，说明是新增，不管，新增的处理逻辑在 scanNewAppNamespaced处理
       if (thatInCache != null && appNamespace.getDataChangeLastModifiedTime().after(thatInCache
           .getDataChangeLastModifiedTime())) {
+        // 2. 更新缓存
         appNamespaceIdCache.put(appNamespace.getId(), appNamespace);
         String oldKey = assembleAppNamespaceKey(thatInCache);
         String newKey = assembleAppNamespaceKey(appNamespace);
         appNamespaceCache.put(newKey, appNamespace);
 
+        // 3. 如果 appId 或者 namespace的名称发生了变化，但是ID没有变化，还需要清除缓存
         //in case appId or namespaceName changes
         if (!newKey.equals(oldKey)) {
           appNamespaceCache.remove(oldKey);
         }
 
+        // 4. 如果是public类型的AppNamespace，还需要清理public相关的缓存
         if (appNamespace.isPublic()) {
           publicAppNamespaceCache.put(appNamespace.getName(), appNamespace);
 
@@ -240,6 +276,7 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
             publicAppNamespaceCache.remove(thatInCache.getName());
           }
         } else if (thatInCache.isPublic()) {
+          // 这里是防止Namespace从public变成了private
           //just in case isPublic changes
           publicAppNamespaceCache.remove(thatInCache.getName());
         }
@@ -249,6 +286,10 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
     return foundIds;
   }
 
+  /**
+   * 处理那些需要删除的 AppNamespace，没啥特殊的，就是删除一遍
+   * @param deletedIds
+   */
   //for those deleted app namespaces
   private void handleDeletedAppNamespaces(Set<Long> deletedIds) {
     if (CollectionUtils.isEmpty(deletedIds)) {
@@ -275,6 +316,9 @@ public class AppNamespaceServiceWithCache implements InitializingBean {
     return STRING_JOINER.join(appNamespace.getAppId(), appNamespace.getName());
   }
 
+  /**
+   * 填充数据库相关配置属性，包括 定时扫描数据库中 AppNamespace 数据表的间隔以及重建缓存的间隔时长
+   */
   private void populateDataBaseInterval() {
     scanInterval = bizConfig.appNamespaceCacheScanInterval();
     scanIntervalTimeUnit = bizConfig.appNamespaceCacheScanIntervalTimeUnit();

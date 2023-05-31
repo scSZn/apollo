@@ -93,8 +93,10 @@ public class ReleaseController {
       throw new BadRequestException("Env: %s is not supported emergency publish now", env);
     }
 
+    // 2. 调用Admin服务，发布配置
     ReleaseDTO createdRelease = releaseService.publish(model);
 
+    // 3. 发布事件，进行配置发布后的通知，如发布邮件通知，调用Webhook等
     ConfigPublishEvent event = ConfigPublishEvent.instance();
     event.withAppId(appId)
         .withCluster(clusterName)
@@ -215,7 +217,7 @@ public class ReleaseController {
       releaseService.rollback(Env.valueOf(env), releaseId, userInfoHolder.getUser().getUserId());
     }
 
-    // 4. 最后，发布配置
+    // 4. 最后，发布消息，进行发布后的各种通知，邮件，等等
     ConfigPublishEvent event = ConfigPublishEvent.instance();
     event.withAppId(release.getAppId())
         .withCluster(release.getClusterName())

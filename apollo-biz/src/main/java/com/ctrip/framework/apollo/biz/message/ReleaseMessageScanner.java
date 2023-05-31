@@ -135,6 +135,7 @@ public class ReleaseMessageScanner implements InitializingBean {
     long newMaxIdScanned = releaseMessages.get(messageScanned - 1).getId();
     // check id gaps, possible reasons are release message not committed yet or already rolled back
     if (newMaxIdScanned - maxIdScanned > messageScanned) {
+      // 记录ID gap
       recordMissingReleaseMessageIds(releaseMessages, maxIdScanned);
     }
     // 更新最大ID
@@ -156,10 +157,13 @@ public class ReleaseMessageScanner implements InitializingBean {
     releaseMessages.forEach(releaseMessage -> {
       missingReleaseMessageIds.remove(releaseMessage.getId());
     });
-    //
+    // 增长数据
     growAndCleanMissingMessages();
   }
 
+  /**
+   * 对missingReleaseMessages，如果经过了十次扫描，其中的ID还是不存在，则直接移除，可以认为这些ID的发布记录不存在了
+   */
   private void growAndCleanMissingMessages() {
     Iterator<Entry<Long, Integer>> iterator = missingReleaseMessages.entrySet()
         .iterator();
@@ -173,6 +177,14 @@ public class ReleaseMessageScanner implements InitializingBean {
     }
   }
 
+  /**
+   * 这里是为了查找startID到messages中的最大ID之间，遗漏的ID。
+   * <p>
+   *     假设startId为X，messages中的最大ID为Y。那么missingReleaseMessages就是为了存储 X到Y 的整数，且去掉messages中的所有ID
+   * </p>
+   * @param messages  消息
+   * @param startId   开始的ID
+   */
   private void recordMissingReleaseMessageIds(List<ReleaseMessage> messages, long startId) {
     for (ReleaseMessage message : messages) {
       long currentId = message.getId();

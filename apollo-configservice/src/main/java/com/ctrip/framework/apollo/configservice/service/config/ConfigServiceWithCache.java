@@ -47,6 +47,9 @@ import javax.annotation.PostConstruct;
 import org.springframework.util.CollectionUtils;
 
 /**
+ * <p>
+ *     带缓存的配置服务
+ * </p>
  * config service with guava cache
  *
  * @author Jason Song(song_s@ctrip.com)

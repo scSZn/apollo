@@ -19,6 +19,7 @@ package com.ctrip.framework.apollo.configservice.wrapper;
 import java.util.Map;
 
 /**
+ * <p>一个包装类，对key大小写不敏感的Map类型</p>
  * @author Jason Song(song_s@ctrip.com)
  */
 public class CaseInsensitiveMapWrapper<T> {

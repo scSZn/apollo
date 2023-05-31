@@ -19,6 +19,7 @@ package com.ctrip.framework.apollo.biz.message;
 import com.ctrip.framework.apollo.biz.entity.ReleaseMessage;
 
 /**
+ * 发布消息的监听器
  * @author Jason Song(song_s@ctrip.com)
  */
 public interface ReleaseMessageListener {

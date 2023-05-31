@@ -95,6 +95,11 @@ public class ReleaseMessageServiceWithCache implements ReleaseMessageListener, I
     return result;
   }
 
+  /**
+   * 这里就是简单的查询缓存数据，根据传入的 messages参数进行查询
+   * @param messages
+   * @return
+   */
   public List<ReleaseMessage> findLatestReleaseMessagesGroupByMessages(Set<String> messages) {
     if (CollectionUtils.isEmpty(messages)) {
       return Collections.emptyList();

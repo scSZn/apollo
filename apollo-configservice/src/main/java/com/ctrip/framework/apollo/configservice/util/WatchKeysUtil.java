@@ -68,8 +68,10 @@ public class WatchKeysUtil {
     //Every app has an 'application' namespace
     if (!(namespaces.size() == 1 && namespaces.contains(ConfigConsts.NAMESPACE_APPLICATION))) {
       Set<String> namespacesBelongToAppId = namespacesBelongToAppId(appId, namespaces);
+      // 筛查出 公共命名空间的名称
       Set<String> publicNamespaces = Sets.difference(namespaces, namespacesBelongToAppId);
 
+      // 补充公共命名空间的watchKey
       //Listen on more namespaces if it's a public namespace
       if (!publicNamespaces.isEmpty()) {
         watchedKeysMap
@@ -80,6 +82,14 @@ public class WatchKeysUtil {
     return watchedKeysMap;
   }
 
+  /**
+   * 组装公共命名空间的watchKey
+   * @param applicationId   应用ID
+   * @param clusterName     集群名称
+   * @param namespaces      命名空间名称集合
+   * @param dataCenter      数据中心
+   * @return
+   */
   private Multimap<String, String> findPublicConfigWatchKeys(String applicationId,
                                                              String clusterName,
                                                              Set<String> namespaces,
@@ -109,22 +119,33 @@ public class WatchKeysUtil {
     }
     Set<String> watchedKeys = Sets.newHashSet();
 
+    // 如果不是默认集群，则会添加指定集群的指定Namespace来监听
     //watch specified cluster config change
     if (!Objects.equals(ConfigConsts.CLUSTER_NAME_DEFAULT, clusterName)) {
       watchedKeys.add(generate(appId, clusterName, namespace));
     }
 
+    // 如果默认数据中心不为空，则还会添加指定集群的指定Namespace来监听
     //watch data center config change
     if (!Strings.isNullOrEmpty(dataCenter) && !Objects.equals(dataCenter, clusterName)) {
       watchedKeys.add(generate(appId, dataCenter, namespace));
     }
 
+    // 监听默认集群的Namespace
     //watch default cluster config change
     watchedKeys.add(generate(appId, ConfigConsts.CLUSTER_NAME_DEFAULT, namespace));
 
     return watchedKeys;
   }
 
+  /**
+   * 组装需要监听的key。每一个key有 appID.clusterName.namespaceName 组成
+   * @param appId
+   * @param clusterName
+   * @param namespaces
+   * @param dataCenter
+   * @return
+   */
   private Multimap<String, String> assembleWatchKeys(String appId, String clusterName,
                                                      Set<String> namespaces,
                                                      String dataCenter) {
@@ -138,6 +159,12 @@ public class WatchKeysUtil {
     return watchedKeysMap;
   }
 
+  /**
+   * 查询传入的 namespaces 中所有属于指定 appID 所属应用的 namespace的名称
+   * @param appId
+   * @param namespaces
+   * @return
+   */
   private Set<String> namespacesBelongToAppId(String appId, Set<String> namespaces) {
     if (ConfigConsts.NO_APPID_PLACEHOLDER.equalsIgnoreCase(appId)) {
       return Collections.emptySet();

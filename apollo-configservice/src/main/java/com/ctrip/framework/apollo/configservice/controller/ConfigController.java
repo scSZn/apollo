@@ -76,6 +76,21 @@ public class ConfigController {
     this.gson = gson;
   }
 
+  /**
+   * 获取配置
+   * @param appId                   应用ID
+   * @param clusterName             集群名称
+   * @param namespace               命名空间名称
+   * @param dataCenter              数据中心名称
+   * @param clientSideReleaseKey    客户端当前持有的配置对应的发布消息Key
+   * @param clientIp                客户端的IP
+   * @param clientLabel             客户端持有的标签
+   * @param messagesAsString        客户端传递上来的消息，一般是  集群 -> 最新发布ID
+   * @param request                 请求
+   * @param response                响应
+   * @return
+   * @throws IOException
+   */
   @GetMapping(value = "/{appId}/{clusterName}/{namespace:.+}")
   public ApolloConfig queryConfig(@PathVariable String appId, @PathVariable String clusterName,
                                   @PathVariable String namespace,
@@ -86,6 +101,7 @@ public class ConfigController {
                                   @RequestParam(value = "messages", required = false) String messagesAsString,
                                   HttpServletRequest request, HttpServletResponse response) throws IOException {
     String originalNamespace = namespace;
+    // 对Namespace做正则化
     //strip out .properties suffix
     namespace = namespaceUtil.filterNamespaceName(namespace);
     //fix the character case issue, such as FX.apollo <-> fx.apollo
@@ -95,11 +111,13 @@ public class ConfigController {
       clientIp = WebUtils.tryToGetClientIp(request);
     }
 
+    // 解析 messages，转为 clientMessages
     ApolloNotificationMessages clientMessages = transformMessages(messagesAsString);
 
     List<Release> releases = Lists.newLinkedList();
 
     String appClusterNameLoaded = clusterName;
+    // 如果传入的appID不是占位符，则尝试查询对应的Release信息
     if (!ConfigConsts.NO_APPID_PLACEHOLDER.equalsIgnoreCase(appId)) {
       Release currentAppRelease = configService.loadConfig(appId, clientIp, clientLabel, appId, clusterName, namespace,
           dataCenter, clientMessages);
@@ -111,6 +129,7 @@ public class ConfigController {
       }
     }
 
+    // 如果命名空间不属于传入的APP，则尝试查询公共命名空间的
     //if namespace does not belong to this appId, should check if there is a public configuration
     if (!namespaceBelongsToAppId(appId, namespace)) {
       Release publicRelease = this.findPublicConfig(appId, clientIp, clientLabel, clusterName, namespace,
@@ -120,6 +139,7 @@ public class ConfigController {
       }
     }
 
+    // 如果没有查询到相应的Release信息，则返回失败
     if (releases.isEmpty()) {
       response.sendError(HttpServletResponse.SC_NOT_FOUND,
           String.format(
@@ -130,11 +150,13 @@ public class ConfigController {
       return null;
     }
 
+    // 记录审计信息
     auditReleases(appId, clusterName, dataCenter, clientIp, releases);
 
     String mergedReleaseKey = releases.stream().map(Release::getReleaseKey)
             .collect(Collectors.joining(ConfigConsts.CLUSTER_NAMESPACE_SEPARATOR));
 
+    // 这里是检测到客户端的配置和当前的最新配置是完全相同的情况
     if (mergedReleaseKey.equals(clientSideReleaseKey)) {
       // Client side configuration is the same with server side, return 304
       response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
@@ -143,6 +165,7 @@ public class ConfigController {
       return null;
     }
 
+    // 构造ApolloConfig并返回
     ApolloConfig apolloConfig = new ApolloConfig(appId, appClusterNameLoaded, originalNamespace,
         mergedReleaseKey);
     apolloConfig.setConfigurations(mergeReleaseConfigurations(releases));
@@ -152,6 +175,12 @@ public class ConfigController {
     return apolloConfig;
   }
 
+  /**
+   * 判断namespaceName是否是属于 appID 对应的应用。判断方式很简单，查询缓存中是否有对应的AppNamespace即可
+   * @param appId           应用ID
+   * @param namespaceName   命名空间名称
+   * @return
+   */
   private boolean namespaceBelongsToAppId(String appId, String namespaceName) {
     //Every app has an 'application' namespace
     if (Objects.equals(ConfigConsts.NAMESPACE_APPLICATION, namespaceName)) {
@@ -189,6 +218,9 @@ public class ConfigController {
   }
 
   /**
+   * <p>
+   *     合并releases中的所有的配置项，并返回一个Map结构。在列表前面的Release拥有高优先级
+   * </p>
    * Merge configurations of releases.
    * Release in lower index override those in higher index
    */
